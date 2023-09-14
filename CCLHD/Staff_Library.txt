@@ -1,0 +1,34 @@
+Select 
+Staff_ID, 
+Initials,
+User_Name, 
+Create_DtTm, 
+Create_ID, 
+Edit_DtTm,  
+Edit_ID, 
+Type, 
+Category, 
+Clinic_ID, 
+Bill_Credentials, 
+Last_Name, 
+First_Name,
+ Mdl_Initial, 
+ Suffix, 
+ Gender, 
+ Adr1, 
+ Adr2, 
+ City, 
+ State_Province, 
+ Postal, Country, 
+ Work_Phone, 
+ Fax, 
+ Pager, 
+ CellPhone, 
+ EMail, 
+ Home_Phone, 
+ Can_Be_Scheduled
+
+  From Staff 
+Where Staff.Deleted = 0 
+AND Status_inactive = 0
+AND Type <> 'Location'
