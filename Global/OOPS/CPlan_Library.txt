@@ -1,0 +1,86 @@
+--Query to return the Careplan APPT configurations, hardocded to Cycle1 & All Cycles.
+--contains two XML paths 
+-- frist one for grouping by Day Offset 
+Select CPL_ID, CPL_Set_ID, Version, CPlan_Name, Regimen, Category, Prot_Name, Trial_Phase, Trial_Group, Typical_Cycles,ISNULL(dbo.fn_GetRecordStatus(c.Status_Enum), '') as Status, NewVersion, IsGlobalDept,
+
+(
+Case 
+WHEN (c.Regimen = '1570' or COALESCE(LTRIM(RTRIM(c.Regimen)),'X') = 'X' or (isnumeric(c.Regimen)  = 0 and ISNUMERIC(replace(replace(replace(substring(c.Regimen,1,charindex(' ',c.Regimen)),'/',''),'b',''),'a','')) = 0)) THEN 'NON-EVIQ'
+--WHEN UPPER(c.Regimen)  LIKE '% Trial%' THEN 'TRIAL'
+WHEN c.Regimen <> '1570' and (isnumeric(c.Regimen)  = 1  or ISNUMERIC(replace(replace(replace(substring(c.Regimen,1,charindex(' ',c.Regimen)),'/',''),'b',''),'a','')) = 1)  THEN 'EVIQ'
+ELSE '**UNMAPPED**' 
+END ) as ProtocolID
+/*,
+(
+Select 'D'+ convert(varchar, ISNULL((Day_Offset+1), 0))+': ' +
+(--sub query returns the appts for the given cycle and day offset.
+Select 
+RTRIM(Hsp_Code) +' ('+RTRIM(ISNULL(dbo.fn_ConvertTimeIntToDurationHrMin(Default_Time), ''))+'), ' as "data()"
+From CPlan CPlan1
+INNER JOIN CPItem CPItem1 ON CPlan1.CPL_ID=CPItem1.CPL_ID
+INNER JOIN CPAct CPAct1 ON CPItem1.CPA_ID = CPAct1.CPA_ID
+INNER JOIN CPComp CPComp1 ON CPItem1.CPA_ID = CPComp1.CPA_ID
+INNER JOIN CPC_CPT CPC_CPT1 ON CPComp1.CPC_ID = CPC_CPT1.CPC_ID
+INNER JOIN CPT CPT1 ON CPC_CPT1.PRS_ID= CPT1.PRS_ID
+INNER JOIN Active_Cycles Active_Cycles1  ON CPItem1.CPI_ID= Active_Cycles1.CPI_ID
+Where
+CPlan1.CPL_ID = c.CPL_ID and 
+CPAct1.Inactive <> 1 AND
+(Cycle1 = 1 OR All_Cycles = 1) AND
+CPItem1.Day_Offset = CPItem.Day_Offset
+FOR XML PATH('')
+) as "data()"
+
+From CPlan
+INNER JOIN CPItem ON CPlan.CPL_ID=CPItem.CPL_ID
+INNER JOIN CPAct ON CPItem.CPA_ID = CPAct.CPA_ID
+INNER JOIN CPComp ON CPItem.CPA_ID = CPComp.CPA_ID
+INNER JOIN CPC_CPT ON CPComp.CPC_ID = CPC_CPT.CPC_ID
+INNER JOIN CPT ON CPC_CPT.PRS_ID= CPT.PRS_ID
+INNER JOIN Active_Cycles  ON CPItem.CPI_ID= Active_Cycles.CPI_ID
+
+Where
+CPlan.CPL_ID = c.CPL_ID and 
+CPAct.Inactive <> 1 AND
+(Cycle1 = 1 OR All_Cycles = 1)
+group by  CPlan.CPL_ID, Day_Offset
+FOR XML PATH('') 
+) as C1_Appts,
+
+(
+Select 'D'+ convert(varchar, ISNULL((Day_Offset+1), 0))+': ' +
+(--sub query returns the appts for the given cycle and day offset.
+Select 
+RTRIM(Hsp_Code) +' ('+RTRIM(ISNULL(dbo.fn_ConvertTimeIntToDurationHrMin(Default_Time), ''))+'), ' as "data()"
+From CPlan CPlan1
+INNER JOIN CPItem CPItem1 ON CPlan1.CPL_ID=CPItem1.CPL_ID
+INNER JOIN CPAct CPAct1 ON CPItem1.CPA_ID = CPAct1.CPA_ID
+INNER JOIN CPComp CPComp1 ON CPItem1.CPA_ID = CPComp1.CPA_ID
+INNER JOIN CPC_CPT CPC_CPT1 ON CPComp1.CPC_ID = CPC_CPT1.CPC_ID
+INNER JOIN CPT CPT1 ON CPC_CPT1.PRS_ID= CPT1.PRS_ID
+INNER JOIN Active_Cycles Active_Cycles1  ON CPItem1.CPI_ID= Active_Cycles1.CPI_ID
+Where
+CPlan1.CPL_ID = c.CPL_ID and 
+CPAct1.Inactive <> 1 AND
+(Cycle2 = 1 OR All_Cycles = 1) AND
+CPItem1.Day_Offset = CPItem.Day_Offset
+FOR XML PATH('')
+) as "data()"
+
+From CPlan
+INNER JOIN CPItem ON CPlan.CPL_ID=CPItem.CPL_ID
+INNER JOIN CPAct ON CPItem.CPA_ID = CPAct.CPA_ID
+INNER JOIN CPComp ON CPItem.CPA_ID = CPComp.CPA_ID
+INNER JOIN CPC_CPT ON CPComp.CPC_ID = CPC_CPT.CPC_ID
+INNER JOIN CPT ON CPC_CPT.PRS_ID= CPT.PRS_ID
+INNER JOIN Active_Cycles  ON CPItem.CPI_ID= Active_Cycles.CPI_ID
+
+Where
+CPlan.CPL_ID = c.CPL_ID and 
+CPAct.Inactive <> 1 AND
+(Cycle2 = 1 OR All_Cycles = 1)
+group by  CPlan.CPL_ID, Day_Offset
+FOR XML PATH('') 
+) as C2_Appts
+*/
+FROM CPlan c

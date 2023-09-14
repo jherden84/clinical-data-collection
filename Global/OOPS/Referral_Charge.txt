@@ -1,0 +1,46 @@
+Select 
+ 
+ Charge.CHG_ID, 
+ Charge.PAU_ID, 
+ Charge.Proc_DtTm, 
+ convert(date, Charge.Proc_DtTm) as Proc_Date,
+ Charge.Create_DtTm as Charge_Create_DtTm,
+ Charge.Edit_DtTm as Charge_Edit_DtTm,
+ Charge.Pat_ID1,
+ Charge.IsInpatient,
+ Charge.Staff_ID as Rendering_Staff_ID ,
+ Config.Inst_Abrv,
+ Admin.Pat_Postal, 
+ Admin.Pat_City, 
+ Admin.Pat_Postal +',' + Admin.Pat_State+ ',' +'Australia' as MapLocation,
+ --Admin.Expired_DtTm as Deceased_DtTm,  
+ ISNULL(dbo.fn_getstaffname(Charge.Staff_ID, 'NAMELFM'),'') as Rendering_StaffName,
+ ISNULL(dbo.fn_GetStfExtDetail(Charge.Referring_MD_ID,1,4), 'Unknown') as Referring_MD	,
+ PatAuth.Eff_DtTm,
+ Rendering_Staff.Type as 'Rendering Staff Type'
+,Charge.PRS_ID
+,Charge.Location_ID
+
+ 
+ From Charge
+ INNER JOIN PatAuth ON PatAuth.PAU_ID = Charge.PAU_ID
+ --INNER JOIN CPT ON Charge.PRS_ID = CPT.PRS_ID
+ INNER JOIN Staff Rendering_Staff ON Charge.Staff_ID = Rendering_Staff.Staff_ID
+ INNER JOIN Config ON Charge.Inst_ID = Config.Inst_ID
+ INNER JOIN Admin ON Charge.Pat_ID1 = Admin.Pat_ID1
+
+Where 1=1
+ AND (Charge.Proc_DtTm>=CAST(  '&[ReportingStartDate]&' AS DATETIME)  
+ AND Charge.Proc_DtTm<CAST( '&[ReportingEndDate]&' AS DATETIME)) 
+ /*AND CPT.Hsp_Code IN (	/*Select Intial Appts*/
+						Select DISTINCT Hsp_Code -- , Short_Desc, Description, Alt_Description
+						From CPT 
+						Where CGroup = 'CON'
+						AND CPT.Status_Inactive = 0
+						AND (Hsp_Code LIKE '%New%' or Hsp_Code LIKE '%NP%') 
+						)*/
+--AND CPT.Deleted = 0 --ignore as this has been charged.
+AND Charge.Void = 0
+AND Charge.Non_Billable = 0
+--AND Charge.Billable = 1 --many site dont use this flag. But non-billable is often used.
+AND NOT(Charge.Pat_ID1 IN (&[TestPatientList]&))
