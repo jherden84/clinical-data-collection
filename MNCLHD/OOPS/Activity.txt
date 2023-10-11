@@ -1,0 +1,103 @@
+ 
+SELECT 
+Patient.Pat_ID1, 
+Last_Name, 
+First_Name, 
+Ident.IDA, 
+Ident.IDB, 
+Ident.IDC, 
+Clin_Status
+
+INTO #testpt
+FROM Patient
+INNER JOIN Ident ON Patient.Pat_ID1 = Ident.Pat_ID1 AND Ident.Version = 0
+Where 1=1 
+AND Clin_Status <>10
+AND 
+(UPPER(Last_Name) LIKE 'TEST%'
+OR  UPPER(Last_Name) LIKE 'ZZ%'
+OR  UPPER(Last_Name) LIKE 'XX%'
+--OR NOT(Ident.IDA LIKE '[0-9]%')
+--OR len(Ident.IDA) <> 7
+)
+
+
+
+
+ 
+ 
+ 
+ 
+ 
+ SELECT 
+
+ Staff_Primary.Staff_ID,
+ Schedule.Edit_ID,
+ Schedule.App_DtTm as Sch_App_DtTm,
+ Convert(date, Schedule.App_DtTm) as Sch_App_Date,
+ ISNULL(RTRIM(Staff_Primary.Last_Name) + ', ' + Staff_Primary.First_Name, '') as Sch_StaffName_Primary, 
+ Schedule.Version as Sch_Version, 
+ ISNULL(Staff_Location.Last_Name, '') as Sch_LocationName,  
+ Schedule.Sch_Id as Sch_Sch_Id, 
+ Schedule.Pat_ID1 as Sch_Pat_ID1,
+ Schedule.Activity as Sch_Activity,
+ Staff_Admin_Attending.Type as Attending_Type, 
+ Staff_Admin_Attending.Last_Name as Attending_Last_Name, 
+ Staff_Admin_Attending.First_Name as Attending_First_Name,
+ ISNULL(dbo.fn_GetPatientAgeDistribution(Admin.Pat_ID1,  Schedule.App_DtTm),'') as Pt_AgeBand,
+ ISNULL(dbo.fn_GetPatientAgeYears(Admin.Pat_ID1,  Schedule.App_DtTm),'') as Pt_Age,
+ Admin.Gender,
+ Schedule.Location as Location_ID,
+
+ 
+ Queue.QUE_ID as Q_QUE_ID, 
+ Queue.Location as Q_LocationID, 
+ Queue.Inst_ID as Q_Inst_ID, 
+ Queue.Edit_DtTm Q_Edit_DtTm, 
+ Queue.Complete as Q_Complete, 
+ Queue.QUE_Set_ID, 
+ Queue.Create_ID Q_Create_ID, 
+ Queue.Create_DtTm Q_Create_DtTm, 
+
+
+ ISNULL(Admin.Pat_City, 'NOT KNOWN') as Pt_City, 
+ Case WHEN Admin.Pat_Postal = '' then 'NOT KNOWN'
+ ELSE ISNULL(Admin.Pat_Postal, 'NOT KNOWN') END as Pt_Postal,
+ ISNULL(dbo.fn_GetPatientName(Admin.Pat_ID1, 'NAMEFML'), '') as Pt_fnPatientName, 
+ ISNULL(dbo.fn_GetPatDisplayID(Admin.Pat_ID1,Schedule.Inst_ID,0), '') as Pt_fnPatientDisplayId,
+ ISNULL(dbo.fn_GetScheduleStatusStr(Schedule.Sch_Id,'ABRV'), '') as Sch_fnApptStatusString, 
+ dbo.fn_ConvertTimeIntTodatetime(Queue.complete_time) as Q_fnCompletedTime,
+ dbo.fn_ConvertTimeIntToDatetime(Queue.Arrived) as Q_fnArrived, 
+ ISNULL(dbo.fn_getStaffName(Queue.Location,'NAMELFM'),'') as Q_LocationName, 
+ ISNULL(dbo.fn_ConvertTimeIntToDurationInMin(Schedule.Duration_time), '') as Sch_fnDuration,
+ ISNULL(dbo.fn_ConvertTimeIntToDurationHrMin(Schedule.Duration_time), '') as Sch_fnDurationHrMin,
+ (Schedule.Duration_time/6000) as Duration,
+  (convert(decimal, Schedule.Duration_time)/6000)/60 as Durationhr,
+
+
+ Config.Inst_Abrv as Config_Inst_Abrv,
+ ISNULL(dbo.fn_GetPatDiagInfo(Admin.Pat_ID1,1,1), '') as Prmy_Dx_Code,
+ ISNULL(dbo.fn_GetPatDiagInfo(Admin.Pat_ID1,1,2), '') as Prmy_Dx_Category
+ 
+ FROM  Schedule Schedule 
+ --INNER JOIN CPT as CPT (NOLOCK) ON Schedule.Activity=CPT.Hsp_Code
+ LEFT OUTER JOIN Staff Staff_Primary (NOLOCK) ON Schedule.Staff_ID=Staff_Primary.Staff_ID
+ LEFT OUTER JOIN Admin Admin (NOLOCK) ON Schedule.Pat_ID1=Admin.Pat_ID1
+ LEFT OUTER JOIN Staff Staff_Location  (NOLOCK) ON Schedule.Location=Staff_Location.Staff_ID
+ LEFT OUTER JOIN Staff Staff_Admin_Attending (NOLOCK)  ON Admin.Attending_Md_Id=Staff_Admin_Attending.Staff_ID
+ -- LEFT OUTER JOIN Schedule_ScheduleStatus_MTM Schedule_ScheduleStatus_MTM (NOLOCK)  ON Schedule.Sch_Id=Schedule_ScheduleStatus_MTM.Sch_ID
+ --LEFT OUTER JOIN ScheduleStatus ScheduleStatus (NOLOCK)  ON Schedule_ScheduleStatus_MTM.ScheduleStatusID=ScheduleStatus.ScheduleStatusID
+ LEFT OUTER JOIN Config (NOLOCK) on Schedule.Inst_ID = Config.Inst_ID
+ Left OUTER JOIN ( Select * FROM Queue (NOLOCK)  Where Version = 0 ) as Queue  ON Schedule.Sch_Id=Queue.Sch_ID 
+
+ 
+WHERE 1=1 
+AND Schedule.Version=0 -- Current Appt Version only.
+AND Schedule.Pat_ID1 >10000 -- only patient appts, can remove is you want non-patient appts. 
+--AND Schedule.Inst_ID<>3 -- Inst_ID Filtering 
+AND (Schedule.App_DtTm>= CAST(  '&[ReportingStartDate]&' AS DATETIME) 
+AND Schedule.App_DtTm<CAST( '&[ReportingEndDate]&' AS DATETIME)) 
+--AND Staff_Location.Last_Name NOT  LIKE 'Z_%'
+AND Schedule.ESI_AppointmentID = ''
+AND NOT(Schedule.Pat_ID1 IN (SELECT Pat_ID1 FROM #testpt ))
+ 

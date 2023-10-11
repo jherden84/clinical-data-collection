@@ -1,0 +1,76 @@
+ 
+SELECT 
+Patient.Pat_ID1, 
+Last_Name, 
+First_Name, 
+Ident.IDA, 
+Ident.IDB, 
+Ident.IDC, 
+Clin_Status
+
+INTO #testpt
+FROM Patient
+INNER JOIN Ident ON Patient.Pat_ID1 = Ident.Pat_ID1 AND Ident.Version = 0
+Where 1=1 
+AND Clin_Status <>10
+AND 
+(UPPER(Last_Name) LIKE 'TEST%'
+OR  UPPER(Last_Name) LIKE 'ZZ%'
+OR  UPPER(Last_Name) LIKE 'XX%'
+--OR NOT(Ident.IDA LIKE '[0-9]%')
+--OR len(Ident.IDA) <> 7
+)
+
+
+
+
+SELECT
+	 ObsReq.Obs_DtTm
+	,ObsDef_label.Label
+	,ObsReq.OBR_SET_ID
+	,ObsReq.Pat_ID1
+	,ObsReq.Create_DtTm
+	,ISNULL(dbo.fn_GetObsResult(Observe.OBX_ID, 0), '') AS Result
+	,ObsDef_label.Code
+	,ObsReq.Panel_Code
+	,ObsReq.Filler_Order --unique Identifier for PRMS
+	,observe.OBD_ID
+	,a.Gender
+	,a.Pat_Postal
+	--,'' AS Race --,
+	,CASE WHEN a.Race != '' THEN a.Race ELSE CASE WHEN Race_prompt.Text IS NOT NULL THEN Race_prompt.Text ELSE Ethnicity_prompt.text END END AS Race
+	,Attending.Type as Attending_Type
+	,Attending.Last_Name as Attending_Last_Name
+	,Attending.First_Name as Attending_First_Name
+	, ISNULL(dbo.fn_GetPatientAgeDistribution(a.Pat_ID1,  ObsReq.Obs_DtTm),'') as Pt_AgeBand
+	,ISNULL(dbo.fn_GetPatientAgeYears(a.Pat_ID1,  ObsReq.Obs_DtTm),'') as Pt_Age
+	
+
+
+FROM ObsReq ObsReq (nolock)
+INNER JOIN Observe Observe (nolock)
+	 ON ObsReq.OBR_SET_ID = Observe.OBR_SET_ID
+INNER JOIN ObsDef ObsDef_label (nolock)
+	 ON Observe.OBD_ID = ObsDef_label.OBD_ID
+INNER JOIN Admin a (nolock)
+ ON ObsReq.Pat_ID1 = a.Pat_ID1
+INNER JOIN Staff Attending (nolock)
+ ON a.Attending_MD_Id = Attending.Staff_ID
+
+ --Ab&TSI
+ LEFT OUTER JOIN 
+			( SELECT ADM_ID, MAX(PRO_ID) AS PRO_ID_m
+				FROM Race with (nolock)
+				GROUP BY ADM_ID
+			) AS partial_race ON a.ADM_ID = partial_race.ADM_ID
+LEFT OUTER JOIN Prompt AS Race_prompt with (nolock) ON Race_prompt.Pro_ID = partial_race.PRO_ID_m
+LEFT OUTER JOIN prompt AS Ethnicity_prompt with (nolock) ON Ethnicity_prompt.Pro_ID = a.Ethnicity_PRO_ID
+
+
+WHERE 1 = 1
+AND Sending_Application = 'PRMS'
+AND ObsReq.Version = 0
+AND ObsReq.Status_Enum <> 1
+AND Observe.Pat_ID1 >10000
+AND ObsReq.Pat_ID1 >10000
+AND NOT(ObsReq.Pat_ID1 IN (SELECT Pat_ID1 FROM #testpt ))
