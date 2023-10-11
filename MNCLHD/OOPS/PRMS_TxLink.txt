@@ -1,0 +1,84 @@
+
+SELECT 
+Patient.Pat_ID1, 
+Last_Name, 
+First_Name, 
+Ident.IDA, 
+Ident.IDB, 
+Ident.IDC, 
+Clin_Status
+
+INTO #testpt
+FROM Patient
+INNER JOIN Ident ON Patient.Pat_ID1 = Ident.Pat_ID1 AND Ident.Version = 0
+Where 1=1 
+AND Clin_Status <>10
+AND 
+(UPPER(Last_Name) LIKE 'TEST%'
+OR  UPPER(Last_Name) LIKE 'ZZ%'
+OR  UPPER(Last_Name) LIKE 'XX%'
+--OR NOT(Ident.IDA LIKE '[0-9]%')
+--OR len(Ident.IDA) <> 7
+)
+
+
+
+
+ if object_id('tempdb..#ObsDef') is not null
+drop table #ObsDef
+if object_id('tempdb..#PatTx') is not null
+drop table #PatTx
+if object_id('tempdb..#Items') is not null
+drop table #Items
+if object_id('tempdb..#ObsReq') is not null
+drop table #ObsReq
+
+Select PatCPlan.Pat_ID1
+, PatCPlan.PCP_Group_ID
+, PatCPlan.CPL_ID, Cycle_Number
+, min(PharmAdm.Adm_DtTm) AS min_admin
+, max(PharmAdm.Adm_DtTm) AS max_admin
+, max((PharmAdm.Adm_DtTm + (CPlan.Cycle_Length - isnull(CPItem.Day_Offset,0)) - 1)) AS cycle_end
+, MIN(CPlan.Cycle_Length) AS Cycle_Length
+
+--TOP 100 * 
+	INTO #PatTx
+	From PatCPlan with (nolock)
+		INNER JOIN PatCItem with (nolock) ON PatCPlan.PCP_ID = PatCItem.PCP_ID
+		INNER JOIN Orders with (nolock) ON PatCItem.PCI_ID = Orders.PCI_ID 
+			AND Orders.Cycle_Day IS NOT NULL 
+			AND Orders.PCI_ID IS NOT NULL  
+			AND Orders.Version = 0 
+			AND Orders.Status_Enum NOT IN (1)
+		INNER JOIN PharmAdm with (nolock) ON PharmAdm.ORC_Set_ID = Orders.ORC_Set_ID
+		INNER JOIN CPlan (nolock) ON PatCPlan.CPL_ID = CPlan.CPL_ID
+		LEFT OUTER JOIN CPItem with (nolock) ON PatCItem.CPI_ID = CPItem.CPI_ID -- This is added to get the offset day for a drug in the Cplan. E.g. A drug might not be administered till day 4.
+		
+		--WHERE --PatCPlan.Pat_ID1 IN (SELECT Pat_ID1 FROM #ObsDef)
+
+Group By PatCPlan.Pat_ID1, PatCPlan.PCP_Group_ID, PatCPlan.CPL_ID, Cycle_Number--, Due_DtTm
+
+--Select * From #PatTx Where convert(date, min_admin) <> convert( date,  OrdDue)
+--Select TOP 100 * From PatCItem
+
+Select DISTINCT Pat_ID1, Obs_DtTm ---, OBR_Set_ID 
+, Filler_Order
+
+INTO #ObsReq
+From ObsReq (nolock)
+WHERE 1=1
+AND Sending_Application = 'PRMS'
+AND Version = 0
+AND Status_Enum <> 1 --void?
+
+--Select * From #ObsReq
+
+
+/*This will display Patient Treated and the Relvant PRMS Survey Filler_Order Number*/
+
+Select * 
+FROM #PatTx
+INNER JOIN #ObsReq ON #PatTx.Pat_ID1 = #ObsReq.Pat_ID1 
+			AND convert(date, #ObsReq.Obs_DtTm) >= convert(date, #PatTx.min_admin)  --assumption here that the min_admin is at the start of cycle
+			AND convert(date,#ObsReq.Obs_DtTm) <= convert(date,#PatTx.min_admin+Cycle_Length)	-- this could inflat the end date is min_admin is not at start of cycle
+Where NOT(#PatTx.Pat_ID1 IN (SELECT Pat_ID1 FROM #testpt ))
